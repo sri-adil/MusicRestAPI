@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.net.URI;
 
 @RestController
 @RequestMapping("/api")
@@ -33,8 +34,9 @@ public class MusicController {
 
     // POST - /api/songs/upload
     @PostMapping("/songs/upload")
-    public void responseEntity(@RequestParam MultipartFile uploadFile) throws Exception {
-        service.upload(uploadFile);
+    public ResponseEntity<MusicService.UploadResult> responseEntity(@RequestParam MultipartFile uploadFile) throws IOException {
+        MusicService.UploadResult result = service.upload(uploadFile);
+        return ResponseEntity.created(URI.create("/api/songs/" + result.id())).body(result);
     }
 
     // GET - /api/songs
@@ -102,7 +104,7 @@ public class MusicController {
 
     //DELETE - /api/songs/{id}
     @DeleteMapping("/songs/{id}")
-    public ResponseEntity<Boolean>remove(@PathVariable int id){
+    public ResponseEntity<Boolean>remove(@PathVariable int id) throws IOException {
         return ResponseEntity
                 .status(HttpStatus.ACCEPTED)
                 .body(service.remove(id));
