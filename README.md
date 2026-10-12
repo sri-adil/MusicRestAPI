@@ -16,7 +16,7 @@ The following sections detail the available endpoints. Postman screenshots are i
 
 ### 1. Upload Music
 **Endpoint**: `POST /api/songs/upload`
-**Description**: Uploads a music file (multipart/form-data) to the server. The file is stored locally, and its metadata is saved to the database.
+**Description**: Uploads a non-empty music file (multipart/form-data) to the server. Each upload gets a unique storage name so files with the same original name do not overwrite one another. The configured limit is 500 MB by default (`app.upload.max-file-size`); successful uploads return `201 Created`, a `Location` header, and the song ID, original filename, and size.
 
 ![Upload Endpoint](POSTMAN/upload.png)
 
@@ -46,7 +46,7 @@ The following sections detail the available endpoints. Postman screenshots are i
 
 ### 6. Delete Song
 **Endpoint**: `DELETE /api/songs/{id}`
-**Description**: Removes the song record from the database. Note that this operation currently removes the database entry.
+**Description**: Removes the song record from the database and deletes its audio file from local storage. The database record is kept if the file cannot be removed.
 
 ![Delete Endpoint](POSTMAN/delete.png)
 
