@@ -2,11 +2,9 @@ package com.MusicRestApi.RestApiForMusic.Controller;
 
 import com.MusicRestApi.RestApiForMusic.Model.MusicModel;
 import com.MusicRestApi.RestApiForMusic.Service.MusicService;
-import org.springframework.core.io.FileUrlResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.Resource.*;
 import org.springframework.core.io.UrlResource;
-import org.springframework.core.io.support.ResourceRegion;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,10 +14,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 @RestController
@@ -59,26 +55,28 @@ public class MusicController {
 
     // GET- /api/songs/{id}/stream
     @GetMapping("/songs/{id}/stream")
-    public ResponseEntity<byte[]> stream(@PathVariable int id,
-                                         @RequestHeader(value = "Range", required = false) String range)
+    public ResponseEntity<StreamingResponseBody> stream(@PathVariable int id,
+                                                        @RequestHeader(value = "Range", required = false) String range)
             throws IOException {
-        MusicService.StreamChunk chunk = service.getStream(id, range);
+        MusicService.StreamResource stream = service.getStream(id, range);
+        StreamingResponseBody body = output -> service.writeStream(stream, output);
         HttpHeaders headers = new HttpHeaders();
         headers.set(HttpHeaders.ACCEPT_RANGES, "bytes");
-        if (range != null) {
+        headers.setContentLength(stream.length());
+        if (stream.partial()) {
             headers.set(HttpHeaders.CONTENT_RANGE,
-                    "bytes " + chunk.start() + "-" + chunk.end() + "/" + chunk.total());
+                    "bytes " + stream.start() + "-" + stream.end() + "/" + stream.total());
             return ResponseEntity
                     .status(HttpStatus.PARTIAL_CONTENT)
                     .headers(headers)
                     .contentType(MediaType.valueOf("audio/mpeg"))
-                    .body(chunk.content());
+                    .body(body);
         }
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .headers(headers)
                 .contentType(MediaType.valueOf("audio/mpeg"))
-                .body(chunk.content());
+                .body(body);
     }
 
     //GET- /api/songs/{id}/download
