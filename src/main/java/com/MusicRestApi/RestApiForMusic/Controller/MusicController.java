@@ -2,6 +2,9 @@ package com.MusicRestApi.RestApiForMusic.Controller;
 
 import com.MusicRestApi.RestApiForMusic.Model.MusicModel;
 import com.MusicRestApi.RestApiForMusic.Service.MusicService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
@@ -39,6 +42,19 @@ public class MusicController {
         return ResponseEntity
                 .status(HttpStatus.ACCEPTED)
                 .body(service.getAllFiles());
+    }
+
+    // GET - /api/songs/catalog
+    @GetMapping("/songs/catalog")
+    public Page<MusicService.SongSummary> getCatalog(
+            @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "page must be non-negative and size must be between 1 and 100");
+        }
+        return service.getCatalog(query, PageRequest.of(page, size, Sort.by("id").ascending()));
     }
 
     // GET- /api/songs/{id}
