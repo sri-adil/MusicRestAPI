@@ -2,6 +2,8 @@ package com.MusicRestApi.RestApiForMusic.Service;
 
 import com.MusicRestApi.RestApiForMusic.Model.MusicModel;
 import com.MusicRestApi.RestApiForMusic.Repository.musicdb;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.core.io.FileUrlResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
@@ -33,6 +35,7 @@ public class MusicService {
             return end < start ? 0 : end - start + 1;
         }
     }
+    public static record SongSummary(int id, String filename) {}
 
     public MusicService(musicdb musicdb,
                         @org.springframework.beans.factory.annotation.Value("${app.storage.path}") String storagePath) {
@@ -62,6 +65,18 @@ public class MusicService {
 
     public List<MusicModel> getAllFiles() {
         return (List<MusicModel>) musicdb.findAll();
+    }
+
+    public Page<SongSummary> getCatalog(String query, Pageable pageable) {
+        Page<MusicModel> songs = query == null || query.isBlank()
+                ? musicdb.findAll(pageable)
+                : musicdb.findByPathContainingIgnoreCase(query.trim(), pageable);
+        return songs.map(song -> new SongSummary(song.getId(), displayFilename(song.getPath())));
+    }
+
+    private String displayFilename(String storedPath) {
+        String filename = Paths.get(storedPath).getFileName().toString();
+        return filename.replaceFirst("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}_", "");
     }
 
     public Resource getByID(int id) throws MalformedURLException {

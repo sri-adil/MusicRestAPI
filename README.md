@@ -26,6 +26,10 @@ The following sections detail the available endpoints. Postman screenshots are i
 
 ![Get All Songs Endpoint](POSTMAN/AllSongs.png)
 
+### 2a. Browse the Song Catalog
+**Endpoint**: `GET /api/songs/catalog?query=...&page=0&size=20`
+**Description**: Returns a paginated catalog with song IDs and filenames without exposing local storage paths. The optional `query` filters filenames, and page sizes are limited to 100.
+
 ### 3. Get Song by ID
 **Endpoint**: `GET /api/songs/{id}`
 **Description**: Retrieves a specific song file by its unique ID. Returns the file resource for inline use.
