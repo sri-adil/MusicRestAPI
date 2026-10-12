@@ -34,7 +34,7 @@ The following sections detail the available endpoints. Postman screenshots are i
 
 ### 4. Stream Song
 **Endpoint**: `GET /api/songs/{id}/stream`
-**Description**: Streams audio content for the specified song ID. This endpoint supports the `Range` header, allowing clients to request specific byte ranges for seeking and partial content delivery (HTTP 206).
+**Description**: Streams audio content for the specified song ID with bounded memory use. Supports open-ended, closed, and suffix byte ranges (for example, `bytes=100-`, `bytes=100-199`, and `bytes=-500`) for seeking and partial content delivery (HTTP 206). Invalid or unsatisfiable ranges return HTTP 416; multiple ranges are not supported.
 
 ![Stream Endpoint](POSTMAN/stream.png)
 

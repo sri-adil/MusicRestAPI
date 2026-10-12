@@ -10,11 +10,14 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
-import java.util.Arrays;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +28,11 @@ public class MusicService {
     private final musicdb musicdb;
     private final Path storageDir;
 
-    public static record StreamChunk(byte[] content, long start, long end, long total) {}
+    public static record StreamResource(Path path, long start, long end, long total, boolean partial) {
+        public long length() {
+            return end < start ? 0 : end - start + 1;
+        }
+    }
 
     public MusicService(musicdb musicdb,
                         @org.springframework.beans.factory.annotation.Value("${app.storage.path}") String storagePath) {
@@ -65,39 +72,76 @@ public class MusicService {
         return new FileUrlResource(response.get().getPath());
     }
 
-    public StreamChunk getStream(int id, String bytes) throws IOException {
+    public StreamResource getStream(int id, String range) throws IOException {
         Optional<MusicModel> response = musicdb.findById(id);
         if (response.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Music not found");
         }
 
         Path path = Paths.get(response.get().getPath());
-        byte[] musicArray = Files.readAllBytes(path);
-        long start = 0;
-        long finish = musicArray.length - 1;
+        long total = Files.size(path);
+        if (range == null) {
+            return new StreamResource(path, 0, total - 1, total, false);
+        }
 
-        if (bytes != null && bytes.startsWith("bytes=")) {
-            String[] part = bytes.replace("bytes=", "").split("-", 2);
-            if (!part[0].isEmpty()) {
-                start = Long.parseLong(part[0]);
+        if (!range.startsWith("bytes=") || range.indexOf(',') >= 0) {
+            throw invalidRange();
+        }
+
+        String value = range.substring("bytes=".length());
+        String[] bounds = value.split("-", -1);
+        if (bounds.length != 2 || (bounds[0].isEmpty() && bounds[1].isEmpty()) || total == 0) {
+            throw invalidRange();
+        }
+
+        try {
+            long start;
+            long end;
+            if (bounds[0].isEmpty()) {
+                long suffixLength = Long.parseLong(bounds[1]);
+                if (suffixLength <= 0) {
+                    throw invalidRange();
+                }
+                start = Math.max(total - suffixLength, 0);
+                end = total - 1;
+            } else {
+                start = Long.parseLong(bounds[0]);
+                end = bounds[1].isEmpty() ? total - 1 : Long.parseLong(bounds[1]);
+                if (start >= total || end < start) {
+                    throw invalidRange();
+                }
+                end = Math.min(end, total - 1);
             }
-            if (part.length > 1 && !part[1].isEmpty()) {
-                finish = Long.parseLong(part[1]);
+            return new StreamResource(path, start, end, total, true);
+        } catch (NumberFormatException exception) {
+            throw invalidRange();
+        }
+    }
+
+    private ResponseStatusException invalidRange() {
+        return new ResponseStatusException(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE, "Invalid byte range");
+    }
+
+    public void writeStream(StreamResource stream, OutputStream output) throws IOException {
+        long remaining = stream.length();
+        if (remaining == 0) {
+            return;
+        }
+
+        try (FileChannel channel = FileChannel.open(stream.path(), StandardOpenOption.READ)) {
+            channel.position(stream.start());
+            ByteBuffer buffer = ByteBuffer.allocate(64 * 1024);
+            while (remaining > 0) {
+                buffer.clear();
+                buffer.limit((int) Math.min(buffer.capacity(), remaining));
+                int read = channel.read(buffer);
+                if (read < 0) {
+                    break;
+                }
+                output.write(buffer.array(), 0, read);
+                remaining -= read;
             }
         }
-
-        if (start < 0) {
-            start = 0;
-        }
-        if (finish >= musicArray.length) {
-            finish = musicArray.length - 1;
-        }
-        if (start > finish) {
-            throw new ResponseStatusException(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE, "Invalid range");
-        }
-
-        byte[] content = Arrays.copyOfRange(musicArray, (int) start, (int) finish + 1);
-        return new StreamChunk(content, start, finish, musicArray.length);
     }
 
 
